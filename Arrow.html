@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            /* 隐藏body窗口区域滚动条 */
+        }
+    </style>
+    <!--引入three.js三维引擎-->
+    <script src="http://www.yanhuangxueyuan.com/versions/threejsR92/build/three.js"></script>
+    <!-- 引入threejs扩展控件OrbitControls.js -->
+    <script src="http://www.yanhuangxueyuan.com/versions/threejsR92/examples/js/controls/OrbitControls.js"></script>
+    <script src="./demo/Arrow.js"></script>
+    <script src="./demo/Track.js"></script>
+    <script src="./demo/path.js"></script>
+</head>
+
+<body>
+    <button class="startBtn">开始路径漫游</button>
+    <button class="stopBtn">暂停路径漫游</button>
+    <button class="resetBtn">路径漫游重置</button>
+    <button class="showPath">显示漫游路径</button>
+    <button class="hidePath">隐藏漫游路径</button>
+
+    <div id="navigation-title">
+        直行
+        <div id="distance-tips"></div>
+        米后
+        <div id="direction-tips"></div>
+    </div>
+    <script>
+
+        function RoundAndFix(n, d) {
+            let m = Math.pow(10, d)
+            return Math.round(n * m) / m
+        }
+
+        function getMoudle(x, y) {
+            return Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2))
+        }
+
+        /**
+         * 获取前方道路转弯提示
+         * @param {Object} point1 起点
+         * @param {Object} point2 中点
+         * @param {Object} point3 终点
+         * */
+        function getLeftOrRight(point1, point2, point3) {
+            let tips = null
+            let vec1 = [point2.x - point1.x, point2.y - point1.y]
+            let vec2 = [point1.x - point3.x, point1.y - point3.y]
+            let a_b = vec1[0] * vec2[0] + vec1[1] * vec2[1]
+            let moudle1 = getMoudle(vec1[0], vec1[1])
+            let moudle2 = getMoudle(vec2[0], vec2[1])
+            let degree = Math.acos(a_b / (moudle1 * moudle2))
+            if (degree < 3) {
+                if (vec1[0] * vec2[1] - vec1[1] * vec2[0] > 0) {
+                    if (degree > 2.2) {
+                        tips = '左前方前行'
+                    } else {
+                        tips = '左转弯'
+                    }
+                } else {
+                    if (degree > 2.1) {
+                        tips = '右前方前行'
+                    } else {
+                        tips = '右转弯'
+                    }
+                }
+            } else {
+                tips = '行走'
+            }
+            return tips
+        }
+
+        /**
+        * 获取下一个路口 ： 直行 左转 右转
+        * @param {Object} options
+        * @param [options.context] (Object) 上下文
+        * @param [options.position] (Object) 当前最新位置
+        * @return string
+        */
+        function getNextLeftOrRight({ position, context, navigationTitle }) {
+            let tips = null
+            let startPosition, centerPosition, endPosition
+
+            startPosition = position.clone()
+
+            if (context.pointsArr[context._index + 1] && context.pointsArr[context._index + 1 + 1]) {
+                // 中点
+                centerPosition = context.pointsArr[context._index + 1].clone()
+                // 终点
+                endPosition = context.pointsArr[context._index + 1 + 1].clone()
+            }
+
+            if (startPosition && centerPosition && endPosition) {
+                let points = [startPosition, centerPosition, endPosition]
+
+                if (
+                    RoundAndFix(points[0].x, 1) === RoundAndFix(points[1].x, 1) &&
+                    RoundAndFix(points[0].z, 1) === RoundAndFix(points[1].z, 1)
+                ) {
+                    // return tips
+                    return navigationTitle.test_direction
+                }
+
+                tips = getLeftOrRight(
+                    { x: points[0].x, y: points[0].z },
+                    { x: points[1].x, y: points[1].z },
+                    { x: points[2].x, y: points[2].z }
+                )
+            }
+            return tips
+        }
+
+        /**
+         * 当距离下一个路口还有多少米时，是否提示转弯
+         * @param {Object} options
+         * @param [options.distance] (number) 距离下一个入口多少米时进行提示 ，默认1米
+         * @param [options.context] (Object) 上下文
+         * @param [options.position] (Object)  当前最新位置
+         * @returns boolean
+         */
+        function isDirectionTips({ distance = 1, position, context }) {
+            let isDirection = false
+            //  当距离下一个路口还有多少米时，提示 ： 直行 左转 右转
+            let startPosition, endPosition
+            // 当前位置
+            startPosition = position.clone()
+            if (context.pointsArr[context._index + 1]) {
+                // 下一个路口位置
+                endPosition = context.pointsArr[context._index + 1].clone()
+            }
+            if (startPosition && endPosition) {
+                let _distance = new THREE.Vector3(startPosition.x, startPosition.y, startPosition.z)
+                    .clone()
+                    .distanceTo(new THREE.Vector3(endPosition.x, endPosition.y, endPosition.z).clone())
+                if (_distance <= distance) {
+                    // 转弯提示
+                    isDirection = true
+                }
+            }
+            return isDirection
+        }
+
+
+        /**
+         * 当前位置距离下个转折点还有多少米
+         * @param [Object] options
+         * @param [options.position] (Object)  当前最新位置
+         * @param [options.context] (Object) 上下文
+         * @param number
+         */
+        function remainingDistance({ position, context }) {
+            let distance = 0
+            let startPosition, endPosition
+            // 当前位置
+            startPosition = position.clone()
+            if (context.pointsArr[context._index + 1]) {
+                // 下一个路口位置
+                endPosition = context.pointsArr[context._index + 1].clone()
+            }
+            if (startPosition && endPosition) {
+                distance = new THREE.Vector3(startPosition.x, startPosition.y, startPosition.z)
+                    .clone()
+                    .distanceTo(new THREE.Vector3(endPosition.x, endPosition.y, endPosition.z).clone())
+            }
+            return distance
+        }
+
+
+        /**===== 开始 =====**/
+        function init() {
+
+            var scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xa0a0a0);
+            scene.fog = new THREE.Fog(0xa0a0a0, 10, 500);
+
+            let arrow, startFlag = false, endFlag = false
+
+            let navigationTitle = {
+                isDirection: false,
+                test_distance: null,
+                test_direction: null
+            }
+
+            let navigationTitleProxy = new Proxy(navigationTitle, {
+                set(obj, prop, value) {
+                    if (prop === 'direction') {
+                        document.querySelector("#navigation-title").style.display = value ? 'block' : 'none'
+                    } else if (prop === 'test_distance') {
+                        document.querySelector("#distance-tips").innerText = value
+                    } else if (prop === 'test_direction') {
+                        document.querySelector("#direction-tips").innerText = value
+                    }
+                    return obj[prop] = value
+                }
+            })
+
+
+
+            arrow = new Arrow({
+                array: _positionList.map((b) => {
+                    b.z += 0.5
+                    return b
+                }),
+                onMoveCallback: function ({ position, direction }) {
+                    {
+                        // 获取当前位置距离下一个路口 ： 直行 左转 右转
+                        let srt = getNextLeftOrRight({ position: position.clone(), context: this, navigationTitle: navigationTitleProxy })
+                        console.log(`前方 =>>>> 转弯${srt}`)
+                        navigationTitleProxy.test_direction = srt
+                    }
+
+                    {
+                        // 当前距离下一个路口还有多少米时，是否提示转弯
+                        let isDirection = isDirectionTips({ position: position.clone(), context: this })
+                        if (isDirection) {
+                            let srt = getNextLeftOrRight({ position: position.clone(), context: this, navigationTitle: navigationTitleProxy })
+                            console.log(`立即 =>>> ${srt} 转弯`)
+                        }
+                        navigationTitleProxy.isDirection = isDirection
+                    }
+
+                    {
+                        // 当前位置距离下个转折点还有多少米
+                        let _remainingDistance = remainingDistance({ position, context: this })
+                        console.log(`距离下一个转弯处剩余距离 ${_remainingDistance}`)
+                        navigationTitleProxy.test_distance = _remainingDistance
+                    }
+
+                    {
+                        // 镜头跟随
+                        // let posi = position.clone();
+                        // camera.position.set(posi.x, camera.position.y, posi.z)
+                        // let look = posi.add(direction.clone());
+                        // controls.target.x = posi.x;
+                        // controls.target.z = posi.z;
+                    }
+                }
+            })
+
+            // 将箭头加入的场景中
+            let loader = new THREE['TextureLoader']();
+            texture = loader['load']('./pointer.png')
+            texture.matrixAutoUpdate = false;
+            var API = {
+                offsetX: 0,//偏移
+                offsetY: 0,
+                repeatX: 1,//缩放
+                repeatY: 1,
+                rotation: 0,//Math.PI / 1, // 旋转
+                centerX: 0.5,//中心点
+                centerY: 0.5
+            };
+            texture.matrix.setUvTransform(API.offsetX, API.offsetY, API.repeatX, API.repeatY, API.rotation, API.centerX, API.centerY);
+            let material = new THREE.MeshBasicMaterial({ map: texture, opacity: 1, transparent: true, })
+            let geometry = new THREE.CylinderBufferGeometry(3, 1, 1, 32)
+            const cone = new THREE.Mesh(geometry, material)
+            scene.add(cone)
+
+            // 路径添加到场景中
+            const coords = _positionList.map((b) => {
+                return [b.x, b.y, b.z]
+            })
+            let track = new Track({
+                coordinates: coords,
+                iconUrl: './arrow-white.png',
+                isAnimate: true,
+                sizeAttention: true,
+                width: 15,
+            })
+            track.trail.rotateX(Math.PI / 2)
+            scene.add(track.trail);
+
+            /**
+             * 相机设置
+             */
+            var width = window.innerWidth; //窗口宽度
+            var height = window.innerHeight; //窗口高度
+            var k = width / height; //窗口宽高比
+
+            //创建相机对象
+            var camera = new THREE.PerspectiveCamera(75, k, 0.1, 10000);
+            camera.zoom = 1.5
+            camera.position.set(200, 300, 200); //设置相机位置
+            camera.lookAt(scene.position); //设置相机方向(指向的场景对象)
+
+            var renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(width, height);
+            document.body.appendChild(renderer.domElement);
+
+            function render() {
+                renderer.render(scene, camera);
+                requestAnimationFrame(render);
+
+                // 箭头漫游
+                if (arrow.perce >= 1) {
+                    arrow.perce = 0
+                } else {
+                    // startFlag && arrow.run(startFlag, camera, endFlag, qyMapGroup.controls) // 相机漫游
+                    startFlag && arrow.run(startFlag, cone, endFlag) // 物体移动
+                }
+
+                // 路径
+                let p = new THREE.Vector3(0, 0, 0)
+                let d = p.distanceTo(camera.position.clone())
+                track.update({
+                    resolution: d / 1000
+                })
+            }
+            render();
+            var controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+            // 初始化点击事件
+            function initClick() {
+                document.querySelector(".startBtn").addEventListener("click", function () {
+                    startFlag = true
+                })
+
+                document.querySelector(".stopBtn").addEventListener("click", function () {
+                    startFlag = false
+                })
+
+                document.querySelector(".resetBtn").addEventListener("click", function () {
+                    arrow.perce = 0
+                    arrow._index = -1
+                    startFlag = true
+                })
+
+                document.querySelector(".showPath").addEventListener("click", function () {
+                    track.setVisible(true)
+                })
+
+                document.querySelector(".hidePath").addEventListener("click", function () {
+                    track.setVisible(false)
+                })
+            }
+
+            initClick()
+
+        }
+
+        window.onload = () => {
+            init()
+        }
+
+    </script>
+    </>
+
+</html>

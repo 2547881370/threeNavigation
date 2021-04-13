@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            /* 隐藏body窗口区域滚动条 */
+        }
+    </style>
+    <!--引入three.js三维引擎-->
+    <script src="http://www.yanhuangxueyuan.com/versions/threejsR92/build/three.js"></script>
+    <!-- 引入threejs扩展控件OrbitControls.js -->
+    <script src="http://www.yanhuangxueyuan.com/versions/threejsR92/examples/js/controls/OrbitControls.js"></script>
+    <script src="./demo/Track.js"></script>
+    <script src="./demo/path.js"></script>
+</head>
+
+<body>
+    <script>
+        var scene = new THREE.Scene();
+
+        coords = _positionList.map((b) => {
+            return [b.x , b.y , b.z]
+        })
+        let track = new Track({
+            coordinates: coords,
+            iconUrl: './arrow-white.png',
+            isAnimate: true,
+            sizeAttention: true,
+            width : 15
+        })
+        scene.add(track.trail);
+
+        /**
+         * 相机设置
+         */
+        var width = window.innerWidth; //窗口宽度
+        var height = window.innerHeight; //窗口高度
+        var k = width / height; //窗口宽高比
+        
+        //创建相机对象
+        var camera = new THREE.PerspectiveCamera(75, k, 0.1, 10000);
+        camera.zoom = 1.5
+        camera.position.set(200, 300, 200); //设置相机位置
+        camera.lookAt(scene.position); //设置相机方向(指向的场景对象)
+
+        var renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(width, height);
+        document.body.appendChild(renderer.domElement);
+
+        function render() {
+            renderer.render(scene, camera);
+            requestAnimationFrame(render);
+
+            let p = new THREE.Vector3(0, 0, 0)
+            let d = p.distanceTo(camera.position.clone())
+
+            track.update({
+                resolution : d / 1000
+            })
+
+        }
+        render();
+        var controls = new THREE.OrbitControls(camera, renderer.domElement);
+    </script>
+</body>
+
+</html>
