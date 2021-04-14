@@ -1,5 +1,5 @@
 class Arrow {
-  constructor({ array, onMoveCallback }) {
+  constructor({ array, onMoveCallback , onLookAt }) {
     // 将传进来的数组转换为Vec3集合
     let pointsArr = [];
     for (let index = 0; index < array.length; index++) {
@@ -51,6 +51,7 @@ class Arrow {
 
     this._index = -1;
     this.onMoveCallback = onMoveCallback;
+    this.onLookAt = onLookAt
   }
 
   // 获取点，是否转弯，朝向等
@@ -162,6 +163,9 @@ class Arrow {
 
           // cone.lookAt(look);
           mesh.lookAt(look); // 相机漫游1
+          this.onLookAt && this.onLookAt({
+            look
+          })
         }
       }
 

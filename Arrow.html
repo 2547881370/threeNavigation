@@ -147,7 +147,6 @@
             return isDirection
         }
 
-
         /**
          * 当前位置距离下个转折点还有多少米
          * @param [Object] options
@@ -172,6 +171,30 @@
             return distance
         }
 
+        /**
+         * 获取下一个目标点
+         * @param [Object] options
+         * @param [options.position] 当前最新位置
+         * @param [options.context] (Object) 上下文
+         * */
+        function getTargetPosition({ position, context }) {
+            let startPosition, endPosition
+
+            startPosition = position.clone()
+
+            if (context.pointsArr[context._index + 1] && context.pointsArr[context._index + 1 + 1]) {
+                // 中点
+                endPosition = context.pointsArr[context._index + 1].clone()
+            }
+
+            if (startPosition && endPosition) {
+                return {
+                    startPosition, endPosition
+                }
+            } else {
+                return null
+            }
+        }
 
         /**===== 开始 =====**/
         function init() {
@@ -236,11 +259,15 @@
                     {
                         // 镜头跟随
                         // let posi = position.clone();
-                        // camera.position.set(posi.x, camera.position.y, posi.z)
-                        // let look = posi.add(direction.clone());
+                        // camera.position.x = posi.x
                         // controls.target.x = posi.x;
+                        // camera.position.z = posi.z
                         // controls.target.z = posi.z;
+                        // console.log(controls)
                     }
+                },
+                onLookAt: function ({ look }) {
+                    // camera.lookAt(look)
                 }
             })
 
@@ -297,6 +324,7 @@
             var renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(width, height);
             document.body.appendChild(renderer.domElement);
+            var controls = new THREE.OrbitControls(camera, renderer.domElement);
 
             function render() {
                 renderer.render(scene, camera);
@@ -317,9 +345,6 @@
                     resolution: d / 1000
                 })
             }
-            render();
-            var controls = new THREE.OrbitControls(camera, renderer.domElement);
-
             // 初始化点击事件
             function initClick() {
                 document.querySelector(".startBtn").addEventListener("click", function () {
@@ -344,7 +369,8 @@
                     track.setVisible(false)
                 })
             }
-
+           
+            render();
             initClick()
 
         }
