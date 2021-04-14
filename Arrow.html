@@ -277,6 +277,10 @@
             track.trail.rotateX(Math.PI / 2)
             scene.add(track.trail);
 
+            // 辅助坐标系
+            var AxesHelper = new THREE.AxesHelper(250);
+            scene.add(AxesHelper);
+
             /**
              * 相机设置
              */
