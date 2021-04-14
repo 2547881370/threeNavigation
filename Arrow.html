@@ -258,12 +258,10 @@
 
                     {
                         // 镜头跟随
-                        // let posi = position.clone();
-                        // camera.position.x = posi.x
-                        // controls.target.x = posi.x;
-                        // camera.position.z = posi.z
-                        // controls.target.z = posi.z;
-                        // console.log(controls)
+                        let posi = position.clone();
+                        camera.position.set(posi.x , posi.y + 70 , posi.z + 30)
+                        controls.target.set(posi.x , posi.y , posi.z )
+                        controls.update()
                     }
                 },
                 onLookAt: function ({ look }) {

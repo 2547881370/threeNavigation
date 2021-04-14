@@ -145,13 +145,11 @@
                 // controls.update()
             })
             tween.onComplete(function () {
-                // controls.enabled = true
                 if (inspectSwitch && k < count - 1) {
                     animateInspect(point, k + 1)
                 } else {
                     inspectSwitch = false
                 }
-                // callBack && callBack()
             })
             tween.easing(TWEEN.Easing.Cubic.InOut)
             tween.start()
